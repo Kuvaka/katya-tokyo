@@ -377,20 +377,7 @@ function makeShield() {
     return { mesh: g, kind: 'shield' };
 }
 
-function spawnPickup(z) {
-    const roll = Math.random();
-    let pk, y;
-    if (roll < 0.08) {
-        pk = makeHeart();
-        y = 1.9;
-    } else if (roll < 0.2) {
-        pk = makeShield();
-        y = 1.3;
-    } else {
-        pk = makeSushi();
-        y = Math.random() < 0.35 ? 2.0 : 1.15;
-    }
-    const lane = LANES[Math.floor(Math.random() * LANES.length)];
+function placePickup(pk, lane, y, z) {
     pk.mesh.position.set(lane, y, z);
     pk.lane = lane;
     pk.baseY = y;
@@ -398,6 +385,23 @@ function spawnPickup(z) {
     pk.collected = false;
     scene.add(pk.mesh);
     pickups.push(pk);
+}
+
+function spawnPickup(z) {
+    const roll = Math.random();
+    const lane = LANES[Math.floor(Math.random() * LANES.length)];
+    if (roll < 0.08) {
+        placePickup(makeHeart(), lane, 1.9, z);
+    } else if (roll < 0.3) {
+        placePickup(makeShield(), lane, 1.3, z);
+    } else {
+        // Sushi trail of 2-4 items in the same lane
+        const count = 2 + Math.floor(Math.random() * 3);
+        const y = Math.random() < 0.35 ? 2.0 : 1.15;
+        for (let i = 0; i < count; i++) {
+            placePickup(makeSushi(), lane, y, z - i * 2.2);
+        }
+    }
 }
 
 // ===================== Controls =====================
@@ -471,26 +475,33 @@ function slide() {
 }
 
 // ===================== Game state =====================
+const SUSHI_GOAL = 250;
+
 let speed = BASE_SPEED;
 let distance = 0;
 let lives = 3;
+let sushiCount = 0;
 let nextSpawnZ = -30;
-let nextPickupZ = -18;
-let state = 'menu'; // 'menu' | 'play' | 'dead'
+let nextPickupZ = -24;
+let state = 'menu'; // 'menu' | 'play' | 'dead' | 'won'
 
 const hud = document.getElementById('hud');
-const scoreEl = document.getElementById('score');
+const sushiEl = document.getElementById('sushi');
 const livesEl = document.getElementById('lives');
 const welcome = document.getElementById('welcome');
 const gameover = document.getElementById('gameover');
 const finalScore = document.getElementById('finalScore');
+const victoryScreen = document.getElementById('victory');
+const victoryStats = document.getElementById('victoryStats');
 
 document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
+document.getElementById('playAgainBtn').addEventListener('click', startGame);
 
 function startGame() {
     welcome.classList.add('hidden');
     gameover.classList.add('hidden');
+    victoryScreen.classList.add('hidden');
     hud.classList.remove('hidden');
     P.laneIdx = 1;
     P.x = 0; P.targetX = 0;
@@ -507,14 +518,15 @@ function startGame() {
     speed = BASE_SPEED;
     distance = 0;
     lives = 3;
+    sushiCount = 0;
     nextSpawnZ = -30;
-    nextPickupZ = -18;
+    nextPickupZ = -24;
     updateHud();
     state = 'play';
 }
 
 function updateHud() {
-    scoreEl.textContent = Math.floor(distance) + ' м';
+    sushiEl.textContent = '🍣 ' + sushiCount + ' / ' + SUSHI_GOAL;
     livesEl.textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, 3 - lives));
 }
 
@@ -522,8 +534,16 @@ function gameOver() {
     state = 'dead';
     P.alive = false;
     hud.classList.add('hidden');
-    finalScore.textContent = Math.floor(distance) + ' м';
+    finalScore.textContent = '🍣 ' + sushiCount + ' · ' + Math.floor(distance) + ' м';
     gameover.classList.remove('hidden');
+}
+
+function victory() {
+    state = 'won';
+    P.alive = false;
+    hud.classList.add('hidden');
+    victoryStats.textContent = 'Пробежала ' + Math.floor(distance) + ' метров токийских улиц';
+    victoryScreen.classList.remove('hidden');
 }
 
 // ===================== Collisions =====================
@@ -583,7 +603,13 @@ function checkPickups() {
 
 function collectPickup(kind) {
     if (kind === 'sushi') {
-        distance += 12;
+        sushiCount++;
+        distance += 3;
+        if (sushiCount >= SUSHI_GOAL && state === 'play') {
+            updateHud();
+            victory();
+            return;
+        }
     } else if (kind === 'heart') {
         if (lives < 3) lives++;
         else distance += 25;
@@ -672,7 +698,7 @@ function tick(now) {
         nextPickupZ += dz;
         if (nextPickupZ > -8) {
             spawnPickup(-80);
-            nextPickupZ = -(10 + Math.random() * 8);
+            nextPickupZ = -(22 + Math.random() * 14);
         }
         checkPickups();
 
@@ -720,4 +746,5 @@ function spawnPetals(containerId, count) {
 }
 spawnPetals('welcomePetals', 26);
 spawnPetals('gameoverPetals', 18);
+spawnPetals('victoryPetals', 34);
 
