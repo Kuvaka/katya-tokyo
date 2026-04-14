@@ -500,3 +500,26 @@ function tick(now) {
     renderer.render(scene, camera);
 }
 requestAnimationFrame((t) => { lastT = t; tick(t); });
+
+// ===================== Sakura petals (menus) =====================
+function spawnPetals(containerId, count) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const EMOJIS = ['🌸', '🌸', '🌸', '🌺', '💮'];
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('span');
+        p.className = 'petal';
+        p.textContent = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+        p.style.left = (Math.random() * 100) + 'vw';
+        const dur = 9 + Math.random() * 10;
+        p.style.animationDuration = dur + 's';
+        p.style.animationDelay = (-Math.random() * dur) + 's';
+        p.style.fontSize = (14 + Math.random() * 16) + 'px';
+        p.style.setProperty('--drift', (20 + Math.random() * 40) * (Math.random() < 0.5 ? -1 : 1) + 'px');
+        p.style.opacity = 0.55 + Math.random() * 0.4;
+        container.appendChild(p);
+    }
+}
+spawnPetals('welcomePetals', 26);
+spawnPetals('gameoverPetals', 18);
+

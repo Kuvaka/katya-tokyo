@@ -96,3 +96,27 @@ h1 {
 
 #score { color: #fff7d0; }
 #lives { font-size: 20px; letter-spacing: 2px; }
+
+.petals {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+.petal {
+    position: absolute;
+    top: -6vh;
+    animation: petal-fall linear infinite;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));
+    will-change: transform;
+}
+@keyframes petal-fall {
+    0%   { transform: translate3d(0, -8vh, 0) rotate(0deg); }
+    25%  { transform: translate3d(calc(var(--drift, 0px) *  1), 30vh, 0) rotate(180deg); }
+    50%  { transform: translate3d(calc(var(--drift, 0px) * -1), 60vh, 0) rotate(360deg); }
+    75%  { transform: translate3d(calc(var(--drift, 0px) *  1), 90vh, 0) rotate(540deg); }
+    100% { transform: translate3d(0, 118vh, 0) rotate(720deg); }
+}
+
+.screen > :not(.petals) { position: relative; z-index: 1; }
