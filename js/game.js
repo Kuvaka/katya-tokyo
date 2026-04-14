@@ -252,9 +252,33 @@ function makeTorii() {
     return { mesh: g, kind: 'torii' };
 }
 
+// Soft radial glow texture (shared across all lanterns)
+const glowTex = (() => {
+    const size = 128;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    grad.addColorStop(0.00, 'rgba(255,220,150,0.95)');
+    grad.addColorStop(0.25, 'rgba(255,180,100,0.55)');
+    grad.addColorStop(0.55, 'rgba(255,140,60,0.18)');
+    grad.addColorStop(1.00, 'rgba(255,120,40,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+})();
+const glowMat = new THREE.SpriteMaterial({
+    map: glowTex,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+});
+
 function makeLantern() {
     const g = new THREE.Group();
-    const paper = new THREE.MeshStandardMaterial({ color: 0xfff2b8, emissive: 0xffb060, emissiveIntensity: 0.55, roughness: 0.7 });
+    const paper = new THREE.MeshStandardMaterial({ color: 0xfff2b8, emissive: 0xffb060, emissiveIntensity: 0.75, roughness: 0.7 });
     const wood = new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: 0.9 });
     const base = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.25, 0.8), wood);
     base.position.y = 0.12;
@@ -265,7 +289,14 @@ function makeLantern() {
     const cap = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.3, 12), wood);
     cap.position.y = 1.34;
     g.add(cap);
-    return { mesh: g, kind: 'lantern' };
+
+    // Soft glow halo (additive sprite)
+    const glow = new THREE.Sprite(glowMat);
+    glow.position.y = 0.72;
+    glow.scale.set(2.4, 2.4, 1);
+    g.add(glow);
+
+    return { mesh: g, kind: 'lantern', glow };
 }
 
 function makeDaruma() {
@@ -347,6 +378,7 @@ function spawnObstacle(z) {
     o.mesh.rotation.y = (Math.random() - 0.5) * 0.1;
     o.lane = lane;
     o.hit = false;
+    o.phase = Math.random() * Math.PI * 2;
     scene.add(o.mesh);
     obstacles.push(o);
 }
@@ -739,6 +771,10 @@ function tick(now) {
         for (let i = obstacles.length - 1; i >= 0; i--) {
             const o = obstacles[i];
             o.mesh.position.z += dz;
+            if (o.glow) {
+                const pulse = 1 + Math.sin(t * 3.2 + o.phase) * 0.1;
+                o.glow.scale.set(2.4 * pulse, 2.4 * pulse, 1);
+            }
             if (o.mesh.position.z > 12) {
                 scene.remove(o.mesh);
                 obstacles.splice(i, 1);
