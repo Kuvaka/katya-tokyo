@@ -121,6 +121,23 @@ h1 {
 }
 .mute-btn:active { transform: scale(0.9); }
 
+.victory-msg {
+    max-width: 340px;
+    line-height: 1.5;
+}
+.victory-sig {
+    font-style: italic;
+    color: #ffd4ea;
+    font-weight: 600;
+    margin-top: 4px;
+}
+.victory-stats {
+    font-size: 13px;
+    opacity: 0.5;
+    margin-top: 14px;
+    letter-spacing: 0.03em;
+}
+
 .petals {
     position: absolute;
     inset: 0;

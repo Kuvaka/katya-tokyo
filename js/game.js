@@ -562,7 +562,7 @@ function victory() {
     state = 'won';
     P.alive = false;
     hud.classList.add('hidden');
-    victoryStats.textContent = 'Пробежала ' + Math.floor(distance) + ' метров токийских улиц';
+    victoryStats.textContent = '🍣 250 · ' + Math.floor(distance) + ' м по Токио';
     victoryScreen.classList.remove('hidden');
 }
 
