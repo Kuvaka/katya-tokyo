@@ -252,6 +252,50 @@ function makeTorii() {
     return { mesh: g, kind: 'torii' };
 }
 
+// Heart emoji sprite texture (shared for bark hearts)
+const heartTex = (() => {
+    const size = 64;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.font = '52px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('💖', size / 2, size / 2 + 4);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+})();
+
+// Lazy AudioContext for SFX (must init inside user gesture on iOS)
+let audioCtx = null;
+function getAudioCtx() {
+    if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+}
+
+function sfxBark() {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'square';
+    o.connect(g); g.connect(ctx.destination);
+    const t = ctx.currentTime;
+    // Maltipoo = small yippy dog, high pitch
+    o.frequency.setValueAtTime(520, t);
+    o.frequency.setValueAtTime(380, t + 0.07);
+    g.gain.setValueAtTime(0.09, t);
+    g.gain.setValueAtTime(0.11, t + 0.07);
+    g.gain.linearRampToValueAtTime(0, t + 0.22);
+    o.start(t); o.stop(t + 0.24);
+}
+
 // Soft radial glow texture (shared across all lanterns)
 const glowTex = (() => {
     const size = 128;
@@ -381,6 +425,41 @@ function spawnObstacle(z) {
     o.phase = Math.random() * Math.PI * 2;
     scene.add(o.mesh);
     obstacles.push(o);
+}
+
+// ===================== Floating bark hearts =====================
+const floatHearts = [];
+
+function spawnBarkBurst() {
+    if (state !== 'play' || !P.alive) return;
+    const count = 8 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < count; i++) {
+        const mat = new THREE.SpriteMaterial({
+            map: heartTex,
+            transparent: true,
+            depthWrite: false,
+        });
+        const s = new THREE.Sprite(mat);
+        const sz = 0.28 + Math.random() * 0.22;
+        s.scale.set(sz, sz, 1);
+        s.position.set(
+            player.position.x + (Math.random() - 0.5) * 0.5,
+            player.position.y + 1.05 + Math.random() * 0.2,
+            PLAYER_Z + 0.2 + Math.random() * 0.3,
+        );
+        const ang = Math.random() * Math.PI * 2;
+        const sp = 1.5 + Math.random() * 1.8;
+        s.userData = {
+            vx: Math.cos(ang) * sp,
+            vy: 2.6 + Math.random() * 1.4,
+            vz: Math.sin(ang) * sp * 0.4,
+            life: 1,
+            ttl: 1.2 + Math.random() * 0.5,
+        };
+        scene.add(s);
+        floatHearts.push(s);
+    }
+    sfxBark();
 }
 
 // ===================== Pickups =====================
@@ -536,6 +615,7 @@ let lives = 3;
 let sushiCount = 0;
 let nextSpawnZ = -30;
 let nextPickupZ = -24;
+let barkT = 3 + Math.random() * 4;
 let state = 'menu'; // 'menu' | 'play' | 'dead' | 'won'
 
 const hud = document.getElementById('hud');
@@ -547,9 +627,9 @@ const finalScore = document.getElementById('finalScore');
 const victoryScreen = document.getElementById('victory');
 const victoryStats = document.getElementById('victoryStats');
 
-document.getElementById('startBtn').addEventListener('click', startGame);
-document.getElementById('retryBtn').addEventListener('click', startGame);
-document.getElementById('playAgainBtn').addEventListener('click', startGame);
+document.getElementById('startBtn').addEventListener('click', () => { getAudioCtx(); startGame(); });
+document.getElementById('retryBtn').addEventListener('click', () => { getAudioCtx(); startGame(); });
+document.getElementById('playAgainBtn').addEventListener('click', () => { getAudioCtx(); startGame(); });
 
 // ===================== Background music =====================
 const bgm = document.getElementById('bgm');
@@ -588,12 +668,15 @@ function startGame() {
     obstacles.length = 0;
     for (const pk of pickups) scene.remove(pk.mesh);
     pickups.length = 0;
+    for (const h of floatHearts) { scene.remove(h); h.material.dispose(); }
+    floatHearts.length = 0;
     speed = BASE_SPEED;
     distance = 0;
     lives = 3;
     sushiCount = 0;
     nextSpawnZ = -30;
     nextPickupZ = -24;
+    barkT = 3 + Math.random() * 4;
     updateHud();
     state = 'play';
 }
@@ -805,6 +888,30 @@ function tick(now) {
             nextPickupZ = -(22 + Math.random() * 14);
         }
         checkPickups();
+
+        // Random puppy bark + heart burst
+        barkT -= dt;
+        if (barkT <= 0) {
+            spawnBarkBurst();
+            barkT = 4 + Math.random() * 4;
+        }
+
+        // Update floating hearts
+        for (let i = floatHearts.length - 1; i >= 0; i--) {
+            const h = floatHearts[i];
+            const d = h.userData;
+            h.position.x += d.vx * dt;
+            h.position.y += d.vy * dt;
+            h.position.z += d.vz * dt;
+            d.vy -= 2.2 * dt;
+            d.life -= dt / d.ttl;
+            h.material.opacity = Math.max(0, d.life);
+            if (d.life <= 0) {
+                scene.remove(h);
+                h.material.dispose();
+                floatHearts.splice(i, 1);
+            }
+        }
 
         // Shield visual
         if (P.shield > 0) {
