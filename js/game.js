@@ -15,9 +15,26 @@ const PLAYER_Z = 0;
 // ===================== Scene =====================
 const canvas = document.getElementById('canvas');
 const scene = new THREE.Scene();
-const SKY = new THREE.Color(0xffb8d0);
-scene.background = SKY;
-scene.fog = new THREE.Fog(SKY, 28, 85);
+// Evening gradient sky (top dark → warm sunset horizon)
+const skyTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = 2; c.height = 512;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, 512);
+    g.addColorStop(0.00, '#0c0420');
+    g.addColorStop(0.30, '#231041');
+    g.addColorStop(0.58, '#5c245a');
+    g.addColorStop(0.80, '#aa3c5e');
+    g.addColorStop(0.92, '#d85a58');
+    g.addColorStop(1.00, '#e88550');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 2, 512);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+})();
+scene.background = skyTex;
+scene.fog = new THREE.Fog(0x3a1c4c, 30, 88);
 
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 220);
 camera.position.set(0, 4.8, 7.5);
@@ -59,17 +76,56 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 120));
 resize();
 
-// ===================== Lights =====================
-scene.add(new THREE.HemisphereLight(0xffe4f1, 0x442a5c, 0.95));
-const sun = new THREE.DirectionalLight(0xfff2d0, 1.05);
-sun.position.set(8, 18, 4);
+// ===================== Lights (twilight: warm key + cool fill) =====================
+scene.add(new THREE.HemisphereLight(0x5a3078, 0x1a0e28, 0.5));
+// Warm low sunset key from behind-left
+const sun = new THREE.DirectionalLight(0xdd7a55, 0.7);
+sun.position.set(-10, 8, -6);
 scene.add(sun);
+// Cool moonlight fill from opposite
+const moonLight = new THREE.DirectionalLight(0x8aa8e8, 0.4);
+moonLight.position.set(12, 14, 5);
+scene.add(moonLight);
+
+// Distant moon sphere
+const moon = new THREE.Mesh(
+    new THREE.SphereGeometry(3.5, 24, 18),
+    new THREE.MeshBasicMaterial({ color: 0xffeec8, fog: false })
+);
+moon.position.set(-32, 24, -82);
+scene.add(moon);
+
+// Stars — sparse points in upper hemisphere
+const starGeom = new THREE.BufferGeometry();
+const starPos = [];
+for (let i = 0; i < 160; i++) {
+    const phi = Math.random() * 0.55 * Math.PI;          // upper hemisphere
+    const theta = Math.random() * Math.PI * 2;
+    const r = 130;
+    starPos.push(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.cos(phi) + 6,
+        r * Math.sin(phi) * Math.sin(theta) * 0.7 - 18,
+    );
+}
+starGeom.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(
+    starGeom,
+    new THREE.PointsMaterial({
+        color: 0xfff6d8,
+        size: 1.4,
+        sizeAttenuation: false,
+        transparent: true,
+        opacity: 0.7,
+        fog: false,
+    })
+));
 
 // ===================== Road =====================
-const roadMat = new THREE.MeshStandardMaterial({ color: 0x2a2038, roughness: 0.9 });
+const roadMat = new THREE.MeshStandardMaterial({ color: 0x130820, roughness: 0.95 });
 const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffd760 });
-const sideMat = new THREE.MeshStandardMaterial({ color: 0x5c3674, roughness: 0.85 });
-const grassMat = new THREE.MeshStandardMaterial({ color: 0x6b3f88, roughness: 1 });
+const sideMat = new THREE.MeshStandardMaterial({ color: 0x3a1f52, roughness: 0.85 });
+const grassMat = new THREE.MeshStandardMaterial({ color: 0x4a2668, roughness: 1 });
 
 const roadSegments = [];
 function buildRoadSegment() {
@@ -102,22 +158,31 @@ function buildRoadSegment() {
         g.add(planter);
     }
 
-    // Distant silhouetted buildings (simple blocks)
-    const bldMatA = new THREE.MeshStandardMaterial({ color: 0x382248, roughness: 1 });
-    const bldMatB = new THREE.MeshStandardMaterial({ color: 0x4a2a5e, roughness: 1 });
+    // Distant silhouetted buildings (simple blocks) with glowing night windows
+    const bldMatA = new THREE.MeshStandardMaterial({ color: 0x1d1028, roughness: 1 });
+    const bldMatB = new THREE.MeshStandardMaterial({ color: 0x2a1538, roughness: 1 });
     for (let s = -1; s <= 1; s += 2) {
         for (let k = 0; k < 3; k++) {
-            const h = 3 + Math.random() * 6;
+            const h = 3.5 + Math.random() * 6;
             const w = 2 + Math.random() * 2;
             const mat = Math.random() < 0.5 ? bldMatA : bldMatB;
             const bld = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), mat);
-            bld.position.set(s * (ROAD_WIDTH/2 + 6 + Math.random() * 4), h/2, -ROAD_LEN/2 + 2 + k * 6);
+            const bx = s * (ROAD_WIDTH/2 + 6 + Math.random() * 4);
+            const bz = -ROAD_LEN/2 + 2 + k * 6;
+            bld.position.set(bx, h/2, bz);
             g.add(bld);
-            // Window row (emissive)
-            const winMat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(0.1 + Math.random() * 0.1, 0.7, 0.55) });
-            const win = new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, 0.4, 0.05), winMat);
-            win.position.set(bld.position.x, h * 0.7, bld.position.z + w/2 + 0.01);
-            g.add(win);
+            // Multiple glowing window rows — mostly warm yellow, occasional pink neon
+            const rows = 2 + Math.floor(Math.random() * 3);
+            for (let r = 0; r < rows; r++) {
+                const isNeon = Math.random() < 0.18;
+                const hue = isNeon ? (0.92 + Math.random() * 0.05) : (0.09 + Math.random() * 0.08);
+                const winMat = new THREE.MeshBasicMaterial({
+                    color: new THREE.Color().setHSL(hue, 0.9, 0.62 + Math.random() * 0.1),
+                });
+                const win = new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, 0.28, 0.05), winMat);
+                win.position.set(bx, h * (0.25 + r * 0.22), bz + w/2 + 0.02);
+                g.add(win);
+            }
         }
     }
 
@@ -322,7 +387,7 @@ const glowMat = new THREE.SpriteMaterial({
 
 function makeLantern() {
     const g = new THREE.Group();
-    const paper = new THREE.MeshStandardMaterial({ color: 0xfff2b8, emissive: 0xffb060, emissiveIntensity: 0.75, roughness: 0.7 });
+    const paper = new THREE.MeshStandardMaterial({ color: 0xfff2b8, emissive: 0xffb060, emissiveIntensity: 1.2, roughness: 0.7 });
     const wood = new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: 0.9 });
     const base = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.25, 0.8), wood);
     base.position.y = 0.12;
