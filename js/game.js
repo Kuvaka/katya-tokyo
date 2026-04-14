@@ -24,18 +24,39 @@ camera.position.set(0, 4.8, 7.5);
 camera.lookAt(0, 1.4, -6);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+// === Adaptive resolution config ===
+const MAX_DPR = Math.min(window.devicePixelRatio || 1, 2);
+const MIN_DPR = 0.6;
+let currentDpr = MAX_DPR;
+renderer.setPixelRatio(currentDpr);
+
+const BASE_V_FOV = 58;       // vertical FOV for landscape/wide
+const MIN_H_FOV_DEG = 55;    // ensure at least this horizontal FOV on narrow screens
+const MAX_V_FOV_DEG = 82;    // cap to avoid fisheye on ultra-narrow
+const CAM_Z_WIDE = 7.5;
+const CAM_Z_NARROW = 9.0;    // pull back on portrait phones
 
 function resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const aspect = w / h;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h;
+    camera.aspect = aspect;
+
+    // Adaptive FOV: widen vertical FOV on narrow aspects so horizontal view stays usable
+    const minHFovRad = MIN_H_FOV_DEG * Math.PI / 180;
+    const vFovFromMinH = 2 * Math.atan(Math.tan(minHFovRad / 2) / aspect) * 180 / Math.PI;
+    camera.fov = Math.min(Math.max(BASE_V_FOV, vFovFromMinH), MAX_V_FOV_DEG);
+
+    // Pull camera back on portrait to keep all 3 lanes comfortably visible
+    camera.position.z = aspect < 0.75 ? CAM_Z_NARROW : CAM_Z_WIDE;
+    camera.lookAt(0, 1.4, -6);
     camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', () => setTimeout(resize, 100));
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
 resize();
 
 // ===================== Lights =====================
@@ -639,6 +660,32 @@ function collectPickup(kind) {
     updateHud();
 }
 
+// ===================== Adaptive pixel ratio =====================
+let fpsSamples = 0;
+let fpsAccum = 0;
+let fpsNextCheck = 0;
+
+function updateAdaptiveDpr(now, dt) {
+    if (dt <= 0) return;
+    fpsAccum += 1 / dt;
+    fpsSamples++;
+    if (now > fpsNextCheck) {
+        fpsNextCheck = now + 1500;
+        if (fpsSamples > 20) {
+            const avg = fpsAccum / fpsSamples;
+            if (avg < 42 && currentDpr > MIN_DPR) {
+                currentDpr = Math.max(MIN_DPR, currentDpr - 0.2);
+                renderer.setPixelRatio(currentDpr);
+            } else if (avg > 57 && currentDpr < MAX_DPR) {
+                currentDpr = Math.min(MAX_DPR, currentDpr + 0.15);
+                renderer.setPixelRatio(currentDpr);
+            }
+        }
+        fpsAccum = 0;
+        fpsSamples = 0;
+    }
+}
+
 // ===================== Loop =====================
 let lastT = performance.now();
 function tick(now) {
@@ -646,6 +693,7 @@ function tick(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000);
     lastT = now;
     const t = now * 0.001;
+    updateAdaptiveDpr(now, dt);
 
     if (state === 'play') {
         speed += dt * SPEED_RAMP;

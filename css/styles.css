@@ -40,10 +40,13 @@ html, body {
 
 .hidden { display: none !important; }
 
-.emoji { font-size: 64px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.4)); }
+.emoji {
+    font-size: clamp(48px, 13vmin, 72px);
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.4));
+}
 
 h1 {
-    font-size: 48px;
+    font-size: clamp(34px, 11vmin, 56px);
     line-height: 1.05;
     font-weight: 900;
     letter-spacing: -0.02em;
@@ -54,8 +57,19 @@ h1 {
     text-shadow: 0 2px 0 rgba(0,0,0,0.15);
 }
 
-.sub { font-size: 18px; opacity: 0.88; max-width: 320px; line-height: 1.4; }
-.hint { font-size: 13px; opacity: 0.55; margin-top: 18px; line-height: 1.7; }
+.sub {
+    font-size: clamp(14px, 4.2vmin, 20px);
+    opacity: 0.88;
+    max-width: min(340px, 86vw);
+    line-height: 1.45;
+}
+.hint {
+    font-size: clamp(11px, 3vmin, 14px);
+    opacity: 0.55;
+    margin-top: 18px;
+    line-height: 1.7;
+    max-width: min(340px, 90vw);
+}
 
 .btn {
     appearance: none;
@@ -63,9 +77,9 @@ h1 {
     border: none;
     background: linear-gradient(180deg, #ff7ab0 0%, #e23d80 100%);
     color: white;
-    font-size: 22px;
+    font-size: clamp(19px, 5.2vmin, 24px);
     font-weight: 800;
-    padding: 16px 42px;
+    padding: clamp(12px, 3.4vmin, 18px) clamp(28px, 8.5vmin, 48px);
     border-radius: 999px;
     box-shadow: 0 6px 0 #9c1e55, 0 14px 32px rgba(226,61,128,0.45);
     cursor: pointer;
@@ -82,11 +96,11 @@ h1 {
     position: fixed;
     top: calc(env(safe-area-inset-top, 0px) + 14px);
     left: 0; right: 0;
-    padding: 0 20px;
+    padding: 0 clamp(14px, 4vw, 24px);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 22px;
+    font-size: clamp(17px, 4.8vmin, 24px);
     font-weight: 800;
     z-index: 5;
     pointer-events: none;
@@ -95,7 +109,7 @@ h1 {
 }
 
 #sushi { color: #fff7d0; }
-#lives { font-size: 20px; letter-spacing: 2px; }
+#lives { font-size: clamp(15px, 4.2vmin, 22px); letter-spacing: 2px; }
 
 .mute-btn {
     position: fixed;
