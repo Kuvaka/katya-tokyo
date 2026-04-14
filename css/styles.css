@@ -97,6 +97,30 @@ h1 {
 #sushi { color: #fff7d0; }
 #lives { font-size: 20px; letter-spacing: 2px; }
 
+.mute-btn {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+    right: 14px;
+    z-index: 20;
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 19px;
+    cursor: pointer;
+    touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: transform 0.08s;
+}
+.mute-btn:active { transform: scale(0.9); }
+
 .petals {
     position: absolute;
     inset: 0;

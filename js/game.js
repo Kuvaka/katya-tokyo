@@ -498,6 +498,26 @@ document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
 document.getElementById('playAgainBtn').addEventListener('click', startGame);
 
+// ===================== Background music =====================
+const bgm = document.getElementById('bgm');
+const muteBtn = document.getElementById('muteBtn');
+bgm.volume = 0.38;
+let muted = false;
+
+function tryStartBgm() {
+    if (muted) return;
+    bgm.play().catch(() => { /* ignored: autoplay blocked until user gesture */ });
+}
+// Kick off on first tap anywhere (covers iOS autoplay restriction)
+document.getElementById('startBtn').addEventListener('click', tryStartBgm, { once: false });
+
+muteBtn.addEventListener('click', () => {
+    muted = !muted;
+    bgm.muted = muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    if (!muted && bgm.paused) tryStartBgm();
+});
+
 function startGame() {
     welcome.classList.add('hidden');
     gameover.classList.add('hidden');
