@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1028">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Катя в Токио</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div id="welcome" class="screen">
+        <div class="emoji">🐾</div>
+        <h1>Катя<br>в Токио</h1>
+        <p class="sub">Мультипу бежит по токийским улочкам</p>
+        <button id="startBtn" class="btn">Поехали!</button>
+        <div class="hint">
+            Свайп влево/вправо — полоса<br>
+            Свайп вверх или тап — прыжок<br>
+            Свайп вниз — подкат
+        </div>
+    </div>
+
+    <div id="hud" class="hidden">
+        <div id="score">0 м</div>
+        <div id="lives">❤️❤️❤️</div>
+    </div>
+
+    <div id="gameover" class="screen hidden">
+        <div class="emoji">🐾</div>
+        <h1>Ой!</h1>
+        <p class="sub" id="finalScore">0 м</p>
+        <button id="retryBtn" class="btn">Ещё раз</button>
+    </div>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+    </script>
+    <script type="module" src="js/game.js"></script>
+</body>
+</html>
