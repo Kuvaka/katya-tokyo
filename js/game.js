@@ -190,6 +190,13 @@ function buildPuppy() {
 const player = buildPuppy();
 scene.add(player);
 
+const shieldMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(1.35, 24, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffd675, transparent: true, opacity: 0.22, depthWrite: false })
+);
+shieldMesh.visible = false;
+scene.add(shieldMesh);
+
 const P = {
     laneIdx: 1,
     x: 0, targetX: 0,
@@ -197,6 +204,7 @@ const P = {
     sliding: false, slideT: 0,
     alive: true,
     invuln: 0,
+    shield: 0,
 };
 
 // ===================== Obstacles =====================
@@ -269,6 +277,76 @@ function spawnObstacle(z) {
     o.hit = false;
     scene.add(o.mesh);
     obstacles.push(o);
+}
+
+// ===================== Pickups =====================
+const pickups = [];
+
+function makeSushi() {
+    const g = new THREE.Group();
+    const rice = new THREE.MeshStandardMaterial({ color: 0xfff6ea, roughness: 0.7 });
+    const fish = new THREE.MeshStandardMaterial({ color: 0xff8866, roughness: 0.4, emissive: 0xff5533, emissiveIntensity: 0.35 });
+    const seaweed = new THREE.MeshStandardMaterial({ color: 0x1a2c1a, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.32, 14), rice);
+    body.rotation.x = Math.PI/2;
+    g.add(body);
+    const topFish = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.58), fish);
+    topFish.position.y = 0.18;
+    g.add(topFish);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.12, 14), seaweed);
+    band.rotation.x = Math.PI/2;
+    band.position.z = -0.05;
+    g.add(band);
+    return { mesh: g, kind: 'sushi' };
+}
+
+function makeHeart() {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: 0xff4a8c, roughness: 0.25, emissive: 0xff2266, emissiveIntensity: 0.45 });
+    for (let s = -1; s <= 1; s += 2) {
+        const bump = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 12), mat);
+        bump.position.set(s * 0.14, 0.1, 0);
+        g.add(bump);
+    }
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.5, 16), mat);
+    tip.position.y = -0.22;
+    tip.rotation.x = Math.PI;
+    g.add(tip);
+    return { mesh: g, kind: 'heart' };
+}
+
+function makeShield() {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffe066, roughness: 0.2, metalness: 0.5, emissive: 0xffb020, emissiveIntensity: 0.7 });
+    const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0), mat);
+    g.add(orb);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.04, 6, 24), mat);
+    ring.rotation.x = Math.PI/2;
+    g.add(ring);
+    return { mesh: g, kind: 'shield' };
+}
+
+function spawnPickup(z) {
+    const roll = Math.random();
+    let pk, y;
+    if (roll < 0.08) {
+        pk = makeHeart();
+        y = 1.9;
+    } else if (roll < 0.2) {
+        pk = makeShield();
+        y = 1.3;
+    } else {
+        pk = makeSushi();
+        y = Math.random() < 0.35 ? 2.0 : 1.15;
+    }
+    const lane = LANES[Math.floor(Math.random() * LANES.length)];
+    pk.mesh.position.set(lane, y, z);
+    pk.lane = lane;
+    pk.baseY = y;
+    pk.phase = Math.random() * Math.PI * 2;
+    pk.collected = false;
+    scene.add(pk.mesh);
+    pickups.push(pk);
 }
 
 // ===================== Controls =====================
@@ -346,6 +424,7 @@ let speed = BASE_SPEED;
 let distance = 0;
 let lives = 3;
 let nextSpawnZ = -30;
+let nextPickupZ = -18;
 let state = 'menu'; // 'menu' | 'play' | 'dead'
 
 const hud = document.getElementById('hud');
@@ -368,12 +447,17 @@ function startGame() {
     P.sliding = false; P.slideT = 0;
     P.alive = true;
     P.invuln = 0;
+    P.shield = 0;
+    shieldMesh.visible = false;
     for (const o of obstacles) scene.remove(o.mesh);
     obstacles.length = 0;
+    for (const pk of pickups) scene.remove(pk.mesh);
+    pickups.length = 0;
     speed = BASE_SPEED;
     distance = 0;
     lives = 3;
     nextSpawnZ = -30;
+    nextPickupZ = -18;
     updateHud();
     state = 'play';
 }
@@ -410,7 +494,12 @@ function checkCollisions() {
                 }
                 if (hit) {
                     o.hit = true;
-                    loseLife();
+                    if (P.shield > 0) {
+                        P.shield = 0;
+                        shieldMesh.visible = false;
+                    } else {
+                        loseLife();
+                    }
                 }
             }
         }
@@ -422,6 +511,35 @@ function loseLife() {
     P.invuln = 1.2;
     updateHud();
     if (lives <= 0) gameOver();
+}
+
+function checkPickups() {
+    for (let i = pickups.length - 1; i >= 0; i--) {
+        const pk = pickups[i];
+        if (pk.collected) continue;
+        const dz = pk.mesh.position.z;
+        if (dz > -1.1 && dz < 1.1 && Math.abs(pk.lane - P.x) < 1.0) {
+            const playerCenterY = P.y + (P.sliding ? 0.35 : 0.9);
+            if (Math.abs(pk.mesh.position.y - playerCenterY) < 1.1) {
+                pk.collected = true;
+                scene.remove(pk.mesh);
+                pickups.splice(i, 1);
+                collectPickup(pk.kind);
+            }
+        }
+    }
+}
+
+function collectPickup(kind) {
+    if (kind === 'sushi') {
+        distance += 12;
+    } else if (kind === 'heart') {
+        if (lives < 3) lives++;
+        else distance += 25;
+    } else if (kind === 'shield') {
+        P.shield = 5;
+    }
+    updateHud();
 }
 
 // ===================== Loop =====================
@@ -482,11 +600,39 @@ function tick(now) {
             }
         }
 
-        // Spawning
+        // Spawning obstacles
         nextSpawnZ += dz;
         if (nextSpawnZ > -14) {
             spawnObstacle(-70);
             nextSpawnZ = -(16 + Math.random() * 10);
+        }
+
+        // Pickups scroll + bob + spin
+        for (let i = pickups.length - 1; i >= 0; i--) {
+            const pk = pickups[i];
+            pk.mesh.position.z += dz;
+            pk.mesh.rotation.y += dt * 2.5;
+            pk.mesh.position.y = pk.baseY + Math.sin(t * 3 + pk.phase) * 0.13;
+            if (pk.mesh.position.z > 12) {
+                scene.remove(pk.mesh);
+                pickups.splice(i, 1);
+            }
+        }
+        nextPickupZ += dz;
+        if (nextPickupZ > -8) {
+            spawnPickup(-80);
+            nextPickupZ = -(10 + Math.random() * 8);
+        }
+        checkPickups();
+
+        // Shield visual
+        if (P.shield > 0) {
+            P.shield -= dt;
+            shieldMesh.visible = true;
+            shieldMesh.position.set(P.x, P.y + 0.85, PLAYER_Z);
+            shieldMesh.rotation.y += dt * 2.5;
+            shieldMesh.scale.setScalar(1 + Math.sin(t * 9) * 0.05);
+            if (P.shield <= 0) shieldMesh.visible = false;
         }
 
         checkCollisions();
@@ -495,6 +641,7 @@ function tick(now) {
         // Gentle idle camera sway in menus
         player.rotation.y = Math.PI + Math.sin(t * 0.6) * 0.15;
         player.userData.tail.rotation.z = Math.sin(t * 4) * 0.4;
+        shieldMesh.visible = false;
     }
 
     renderer.render(scene, camera);
