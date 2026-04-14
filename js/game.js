@@ -455,7 +455,7 @@ function tick(now) {
         // Player transform + run animation
         const bob = P.y === 0 && !P.sliding ? Math.abs(Math.sin(t * 16)) * 0.08 : 0;
         player.position.set(P.x, P.y + bob, PLAYER_Z);
-        player.rotation.y = (P.targetX - P.x) * 0.25;
+        player.rotation.y = Math.PI + (P.targetX - P.x) * 0.25;
         player.scale.y = P.sliding ? 0.45 : 1;
         player.scale.z = P.sliding ? 1.5 : 1;
         player.userData.legs.forEach((leg, i) => {
@@ -493,7 +493,7 @@ function tick(now) {
         updateHud();
     } else {
         // Gentle idle camera sway in menus
-        player.rotation.y = Math.sin(t * 0.6) * 0.15;
+        player.rotation.y = Math.PI + Math.sin(t * 0.6) * 0.15;
         player.userData.tail.rotation.z = Math.sin(t * 4) * 0.4;
     }
 
