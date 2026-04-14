@@ -247,30 +247,81 @@ function makeLantern() {
     return { mesh: g, kind: 'lantern' };
 }
 
-function makeCrate() {
+function makeDaruma() {
     const g = new THREE.Group();
-    const wood = new THREE.MeshStandardMaterial({ color: 0xa06b3c, roughness: 0.9 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x5a3a1e, roughness: 0.9 });
-    const box = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), wood);
-    box.position.y = 0.55;
-    g.add(box);
-    // Cross beams
-    for (let ax = 0; ax < 2; ax++) {
-        const beam = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.1, 0.1), dark);
-        beam.position.set(0, 0.55, 0.56);
-        beam.rotation.z = ax === 0 ? 0.78 : -0.78;
-        g.add(beam);
+    const red   = new THREE.MeshStandardMaterial({ color: 0xc2302a, roughness: 0.55 });
+    const skin  = new THREE.MeshStandardMaterial({ color: 0xf3d4a8, roughness: 0.65 });
+    const black = new THREE.MeshStandardMaterial({ color: 0x0d0a08, roughness: 0.5 });
+    const gold  = new THREE.MeshStandardMaterial({ color: 0xd4a842, roughness: 0.5, metalness: 0.4 });
+    const white = new THREE.MeshStandardMaterial({ color: 0xfff4e6, roughness: 0.55 });
+
+    // Squashed red body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 22, 16), red);
+    body.scale.set(1.12, 1.15, 1.12);
+    body.position.y = 0.58;
+    g.add(body);
+
+    // Gold cap on top (partial sphere)
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 12, 0, Math.PI * 2, 0, Math.PI / 3), gold);
+    cap.position.y = 1.0;
+    g.add(cap);
+
+    // Peachy face area (flattened forward-facing ellipse; +z is toward player)
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16), skin);
+    face.scale.set(0.95, 1.0, 0.42);
+    face.position.set(0, 0.6, 0.3);
+    g.add(face);
+
+    // Fluffy eyebrows
+    for (let s = -1; s <= 1; s += 2) {
+        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.13, 0.09), black);
+        brow.position.set(s * 0.18, 0.83, 0.56);
+        brow.rotation.z = s * 0.12;
+        g.add(brow);
+        const tuft = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, 0.07), black);
+        tuft.position.set(s * 0.2, 0.75, 0.58);
+        tuft.rotation.z = s * 0.25;
+        g.add(tuft);
     }
-    return { mesh: g, kind: 'crate' };
+
+    // Big round eyes (white with black pupil)
+    for (let s = -1; s <= 1; s += 2) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 12), white);
+        eye.scale.z = 0.38;
+        eye.position.set(s * 0.18, 0.64, 0.62);
+        g.add(eye);
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), black);
+        pupil.scale.z = 0.3;
+        pupil.position.set(s * 0.18, 0.64, 0.68);
+        g.add(pupil);
+    }
+
+    // Turtle-shaped mustache
+    const mCenter = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.06, 0.06), black);
+    mCenter.position.set(0, 0.48, 0.65);
+    g.add(mCenter);
+    for (let s = -1; s <= 1; s += 2) {
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.06), black);
+        wing.position.set(s * 0.13, 0.45, 0.65);
+        wing.rotation.z = s * 0.45;
+        g.add(wing);
+    }
+
+    // Gold base ring
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.09, 16), gold);
+    base.position.y = 0.045;
+    g.add(base);
+
+    return { mesh: g, kind: 'daruma' };
 }
 
 function spawnObstacle(z) {
     const lane = LANES[Math.floor(Math.random() * LANES.length)];
     const roll = Math.random();
     let o;
-    if (roll < 0.4) o = makeTorii();       // slide
-    else if (roll < 0.75) o = makeLantern(); // jump
-    else o = makeCrate();                   // jump
+    if (roll < 0.4) o = makeTorii();        // slide
+    else if (roll < 0.7) o = makeLantern(); // jump
+    else o = makeDaruma();                  // jump
     o.mesh.position.set(lane, 0, z);
     o.mesh.rotation.y = (Math.random() - 0.5) * 0.1;
     o.lane = lane;
