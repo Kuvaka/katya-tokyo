@@ -672,7 +672,7 @@ function slide() {
 }
 
 // ===================== Game state =====================
-const SUSHI_GOAL = 250;
+const SUSHI_GOAL = 125;
 
 let speed = BASE_SPEED;
 let distance = 0;
