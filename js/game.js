@@ -805,19 +805,26 @@ function loseLife() {
     if (lives <= 0) gameOver();
 }
 
-function checkPickups() {
+const PICKUP_Z_R = 1.4;
+const PICKUP_LANE_R = 1.2;
+const PICKUP_Y_R = 1.2;
+
+function checkPickups(dz) {
     for (let i = pickups.length - 1; i >= 0; i--) {
         const pk = pickups[i];
         if (pk.collected) continue;
-        const dz = pk.mesh.position.z;
-        if (dz > -1.1 && dz < 1.1 && Math.abs(pk.lane - P.x) < 1.0) {
-            const playerCenterY = P.y + (P.sliding ? 0.35 : 0.9);
-            if (Math.abs(pk.mesh.position.y - playerCenterY) < 1.1) {
-                pk.collected = true;
-                scene.remove(pk.mesh);
-                pickups.splice(i, 1);
-                collectPickup(pk.kind);
-            }
+        const z = pk.mesh.position.z;
+        const zPrev = z - dz;
+        if (z < -PICKUP_Z_R || zPrev > PICKUP_Z_R) continue;
+        const dxCur = Math.abs(pk.lane - P.x);
+        const dxTgt = Math.abs(pk.lane - P.targetX);
+        if (Math.min(dxCur, dxTgt) >= PICKUP_LANE_R) continue;
+        const playerCenterY = P.y + (P.sliding ? 0.35 : 0.9);
+        if (Math.abs(pk.mesh.position.y - playerCenterY) < PICKUP_Y_R) {
+            pk.collected = true;
+            scene.remove(pk.mesh);
+            pickups.splice(i, 1);
+            collectPickup(pk.kind);
         }
     }
 }
@@ -952,7 +959,7 @@ function tick(now) {
             spawnPickup(-80);
             nextPickupZ = -(22 + Math.random() * 14);
         }
-        checkPickups();
+        checkPickups(dz);
 
         // Random puppy bark + heart burst
         barkT -= dt;
