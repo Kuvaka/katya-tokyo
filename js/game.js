@@ -287,6 +287,16 @@ const shieldMesh = new THREE.Mesh(
 shieldMesh.visible = false;
 scene.add(shieldMesh);
 
+const shieldGlow = new THREE.Mesh(
+    new THREE.SphereGeometry(1.9, 20, 14),
+    new THREE.MeshBasicMaterial({ color: 0xffb040, transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })
+);
+shieldGlow.visible = false;
+scene.add(shieldGlow);
+
+const shieldLight = new THREE.PointLight(0xffd066, 0, 10, 2);
+scene.add(shieldLight);
+
 const P = {
     laneIdx: 1,
     x: 0, targetX: 0,
@@ -733,6 +743,8 @@ function startGame() {
     P.invuln = 0;
     P.shield = 0;
     shieldMesh.visible = false;
+    shieldGlow.visible = false;
+    shieldLight.intensity = 0;
     for (const o of obstacles) scene.remove(o.mesh);
     obstacles.length = 0;
     for (const pk of pickups) scene.remove(pk.mesh);
@@ -793,6 +805,8 @@ function checkCollisions() {
                     if (P.shield > 0) {
                         P.shield = 0;
                         shieldMesh.visible = false;
+                        shieldGlow.visible = false;
+                        shieldLight.intensity = 0;
                     } else {
                         loseLife();
                     }
@@ -994,11 +1008,23 @@ function tick(now) {
         // Shield visual
         if (P.shield > 0) {
             P.shield -= dt;
+            const fade = Math.min(1, P.shield / 1.0);
+            const pulse = 1 + Math.sin(t * 9) * 0.05;
             shieldMesh.visible = true;
             shieldMesh.position.set(P.x, P.y + 0.85, PLAYER_Z);
             shieldMesh.rotation.y += dt * 2.5;
-            shieldMesh.scale.setScalar(1 + Math.sin(t * 9) * 0.05);
-            if (P.shield <= 0) shieldMesh.visible = false;
+            shieldMesh.scale.setScalar(pulse);
+            shieldGlow.visible = true;
+            shieldGlow.position.copy(shieldMesh.position);
+            shieldGlow.scale.setScalar(1 + Math.sin(t * 4.5) * 0.08);
+            shieldGlow.material.opacity = (0.22 + Math.sin(t * 6) * 0.05) * fade;
+            shieldLight.position.set(P.x, P.y + 1.0, PLAYER_Z);
+            shieldLight.intensity = (2.6 + Math.sin(t * 7) * 0.5) * fade;
+            if (P.shield <= 0) {
+                shieldMesh.visible = false;
+                shieldGlow.visible = false;
+                shieldLight.intensity = 0;
+            }
         }
 
         checkCollisions();
@@ -1008,6 +1034,8 @@ function tick(now) {
         player.rotation.y = Math.PI + Math.sin(t * 0.6) * 0.15;
         player.userData.tail.rotation.z = Math.sin(t * 4) * 0.4;
         shieldMesh.visible = false;
+        shieldGlow.visible = false;
+        shieldLight.intensity = 0;
     }
 
     renderer.render(scene, camera);
