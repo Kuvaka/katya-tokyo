@@ -276,6 +276,10 @@ function buildPuppy() {
 const player = buildPuppy();
 scene.add(player);
 
+const playerLight = new THREE.PointLight(0xffc98a, 2.4, 16, 2);
+playerLight.position.set(0, 2.2, PLAYER_Z - 1.2);
+scene.add(playerLight);
+
 const shieldMesh = new THREE.Mesh(
     new THREE.SphereGeometry(1.35, 24, 16),
     new THREE.MeshBasicMaterial({ color: 0xffd675, transparent: true, opacity: 0.22, depthWrite: false })
@@ -905,6 +909,8 @@ function tick(now) {
         // Player transform + run animation
         const bob = P.y === 0 && !P.sliding ? Math.abs(Math.sin(t * 16)) * 0.08 : 0;
         player.position.set(P.x, P.y + bob, PLAYER_Z);
+        playerLight.position.set(P.x, P.y + 2.0, PLAYER_Z - 1.4);
+        playerLight.intensity = 2.2 + Math.sin(t * 5) * 0.25;
         player.rotation.y = Math.PI + (P.targetX - P.x) * 0.25;
         player.scale.y = P.sliding ? 0.45 : 1;
         player.scale.z = P.sliding ? 1.5 : 1;
