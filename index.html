@@ -14,7 +14,8 @@
     <canvas id="canvas"></canvas>
 
     <audio id="bgm" src="audio/bgm.mp4" loop preload="auto"></audio>
-    <button id="muteBtn" class="mute-btn" aria-label="Звук">🔊</button>
+    <button id="muteBtn" class="icon-btn icon-btn--br" aria-label="Звук">🔊</button>
+    <button id="pauseBtn" class="icon-btn icon-btn--bl hidden" aria-label="Пауза">⏸</button>
 
     <div id="welcome" class="screen">
         <div class="petals" id="welcomePetals"></div>
@@ -22,11 +23,18 @@
         <h1>Катя<br>в Токио</h1>
         <p class="sub">Мультипу бежит по токийским улочкам</p>
         <button id="startBtn" class="btn">Поехали!</button>
+        <p class="best-run" id="bestRunWelcome"></p>
         <div class="hint">
             Беги и собирай суши без остановки ✨<br><br>
             Свайп ←→ — полоса · ↑ или тап — прыжок · ↓ — подкат<br>
-            🍣 суши · 💖 жизнь · ✨ щит
+            🍣 суши · 💖 жизнь · ✨ щит · 🧲 магнит
         </div>
+    </div>
+
+    <div id="pause" class="screen hidden">
+        <div class="emoji">⏸</div>
+        <h1>Пауза</h1>
+        <button id="resumeBtn" class="btn">Продолжить</button>
     </div>
 
     <div id="hud" class="hidden">
@@ -43,6 +51,7 @@
         <div class="emoji">🐾</div>
         <h1>Ой!</h1>
         <p class="sub" id="finalScore">0 м</p>
+        <p class="best-run" id="bestRunGameover"></p>
         <button id="retryBtn" class="btn">Ещё раз</button>
     </div>
 

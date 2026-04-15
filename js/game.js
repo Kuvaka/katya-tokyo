@@ -297,6 +297,21 @@ scene.add(shieldGlow);
 const shieldLight = new THREE.PointLight(0xffd066, 0, 10, 2);
 scene.add(shieldLight);
 
+const magnetRing = new THREE.Mesh(
+    new THREE.TorusGeometry(1.15, 0.05, 8, 32),
+    new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
+);
+magnetRing.rotation.x = Math.PI / 2;
+magnetRing.visible = false;
+scene.add(magnetRing);
+
+const magnetRing2 = new THREE.Mesh(
+    new THREE.TorusGeometry(0.92, 0.035, 8, 28),
+    new THREE.MeshBasicMaterial({ color: 0xaaf0ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
+);
+magnetRing2.visible = false;
+scene.add(magnetRing2);
+
 const P = {
     laneIdx: 1,
     x: 0, targetX: 0,
@@ -305,6 +320,7 @@ const P = {
     alive: true,
     invuln: 0,
     shield: 0,
+    magnet: 0,
 };
 
 // ===================== Obstacles =====================
@@ -390,6 +406,72 @@ function sfxBark() {
     g.gain.setValueAtTime(0.11, t + 0.07);
     g.gain.linearRampToValueAtTime(0, t + 0.22);
     o.start(t); o.stop(t + 0.24);
+}
+
+function sfxPickup(tier) {
+    const ctx = getAudioCtx();
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const base = 820 + tier * 140;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(base, t);
+    o.frequency.exponentialRampToValueAtTime(base * 1.6, t + 0.09);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.08, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.18);
+}
+
+function sfxMilestone() {
+    const ctx = getAudioCtx();
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const notes = [660, 880, 1320];
+    notes.forEach((f, i) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(f, t + i * 0.08);
+        g.gain.setValueAtTime(0.0001, t + i * 0.08);
+        g.gain.exponentialRampToValueAtTime(0.11, t + i * 0.08 + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.08 + 0.28);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(t + i * 0.08); o.stop(t + i * 0.08 + 0.3);
+    });
+}
+
+function sfxBuff() {
+    const ctx = getAudioCtx();
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(300, t);
+    o.frequency.exponentialRampToValueAtTime(900, t + 0.25);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.06, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.32);
+}
+
+function sfxHit() {
+    const ctx = getAudioCtx();
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(160, t);
+    o.frequency.exponentialRampToValueAtTime(60, t + 0.2);
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.27);
 }
 
 // Soft radial glow texture (shared across all lanterns)
@@ -636,6 +718,21 @@ function makeShield() {
     return { mesh: g, kind: 'shield' };
 }
 
+function makeMagnet() {
+    const g = new THREE.Group();
+    const red = new THREE.MeshStandardMaterial({ color: 0xff3b5e, roughness: 0.35, emissive: 0xcc1a3a, emissiveIntensity: 0.55 });
+    const white = new THREE.MeshStandardMaterial({ color: 0xf6f6fa, roughness: 0.45, emissive: 0xaabbff, emissiveIntensity: 0.4 });
+    const body = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.12, 10, 18, Math.PI), red);
+    body.rotation.z = -Math.PI / 2;
+    g.add(body);
+    for (let s = -1; s <= 1; s += 2) {
+        const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.18, 12), white);
+        tip.position.set(s * 0.3, -0.09, 0);
+        g.add(tip);
+    }
+    return { mesh: g, kind: 'magnet' };
+}
+
 function placePickup(pk, lane, y, z) {
     pk.mesh.position.set(lane, y, z);
     pk.lane = lane;
@@ -649,10 +746,12 @@ function placePickup(pk, lane, y, z) {
 function spawnPickup(z) {
     const roll = Math.random();
     const lane = LANES[Math.floor(Math.random() * LANES.length)];
-    if (roll < 0.08) {
+    if (roll < 0.06) {
         placePickup(makeHeart(), lane, 1.9, z);
-    } else if (roll < 0.3) {
+    } else if (roll < 0.18) {
         placePickup(makeShield(), lane, 1.3, z);
+    } else if (roll < 0.28) {
+        placePickup(makeMagnet(), lane, 1.5, z);
     } else {
         // Sushi trail of 2-4 items in the same lane
         const count = 2 + Math.floor(Math.random() * 3);
@@ -746,7 +845,31 @@ const COMBO_WINDOW = 2.0;
 let nextSpawnZ = -30;
 let nextPickupZ = -24;
 let barkT = 3 + Math.random() * 4;
-let state = 'menu'; // 'menu' | 'play' | 'dead' | 'won'
+let state = 'menu'; // 'menu' | 'play' | 'paused' | 'dead' | 'won'
+let pausedFrom = 'play';
+
+const FUR_COLOR_STEP = 150;
+const FUR_PALETTE = [0xfff6ec, 0xffcba4, 0xd4bfff, 0xb8f0d4, 0xffc4d6, 0xbfe3ff, 0xfff1a8, 0xc8e6b0, 0xf9b0e4];
+let furTierApplied = 0;
+
+let shakeT = 0;
+let shakeMag = 0;
+
+const BEST_RUN_KEY = 'katya_tokyo_best_v1';
+let bestRun = loadBestRun();
+
+function loadBestRun() {
+    try {
+        const raw = localStorage.getItem(BEST_RUN_KEY);
+        if (!raw) return { sushi: 0, distance: 0 };
+        const v = JSON.parse(raw);
+        return { sushi: v.sushi | 0, distance: v.distance | 0 };
+    } catch { return { sushi: 0, distance: 0 }; }
+}
+
+function saveBestRun() {
+    try { localStorage.setItem(BEST_RUN_KEY, JSON.stringify(bestRun)); } catch {}
+}
 
 const hud = document.getElementById('hud');
 const sushiEl = document.getElementById('sushi');
@@ -758,10 +881,56 @@ const gameover = document.getElementById('gameover');
 const finalScore = document.getElementById('finalScore');
 const victoryScreen = document.getElementById('victory');
 const victoryStats = document.getElementById('victoryStats');
+const pauseBtn = document.getElementById('pauseBtn');
+const pauseScreen = document.getElementById('pause');
+const bestRunWelcome = document.getElementById('bestRunWelcome');
+const bestRunGameover = document.getElementById('bestRunGameover');
+
+function renderBestRun() {
+    const txt = bestRun.sushi > 0
+        ? 'Лучший забег: 🍣 ' + bestRun.sushi + ' · ' + bestRun.distance + ' м'
+        : '';
+    bestRunWelcome.textContent = txt;
+    bestRunGameover.textContent = txt;
+}
+renderBestRun();
 
 document.getElementById('startBtn').addEventListener('click', () => { getAudioCtx(); startGame(); });
 document.getElementById('retryBtn').addEventListener('click', () => { getAudioCtx(); startGame(); });
 document.getElementById('playAgainBtn').addEventListener('click', () => { getAudioCtx(); startGame(); });
+document.getElementById('resumeBtn').addEventListener('click', () => resumeGame());
+pauseBtn.addEventListener('click', () => pauseGame());
+
+function pauseGame() {
+    if (state !== 'play') return;
+    pausedFrom = state;
+    state = 'paused';
+    hud.classList.add('hidden');
+    pauseBtn.classList.add('hidden');
+    pauseScreen.classList.remove('hidden');
+    if (!bgm.paused) bgm.pause();
+}
+
+function resumeGame() {
+    if (state !== 'paused') return;
+    state = pausedFrom;
+    hud.classList.remove('hidden');
+    pauseBtn.classList.remove('hidden');
+    pauseScreen.classList.add('hidden');
+    lastT = performance.now();
+    tryStartBgm();
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state === 'play') pauseGame();
+});
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+        if (state === 'play') pauseGame();
+        else if (state === 'paused') resumeGame();
+    }
+});
 
 // ===================== Background music =====================
 const bgm = document.getElementById('bgm');
@@ -787,7 +956,9 @@ function startGame() {
     welcome.classList.add('hidden');
     gameover.classList.add('hidden');
     victoryScreen.classList.add('hidden');
+    pauseScreen.classList.add('hidden');
     hud.classList.remove('hidden');
+    pauseBtn.classList.remove('hidden');
     P.laneIdx = 1;
     P.x = 0; P.targetX = 0;
     P.y = 0; P.vy = 0;
@@ -795,9 +966,16 @@ function startGame() {
     P.alive = true;
     P.invuln = 0;
     P.shield = 0;
+    P.magnet = 0;
     shieldMesh.visible = false;
     shieldGlow.visible = false;
     shieldLight.intensity = 0;
+    magnetRing.visible = false;
+    magnetRing2.visible = false;
+    FUR.color.setHex(FUR_PALETTE[0]);
+    furTierApplied = 0;
+    shakeT = 0;
+    shakeMag = 0;
     for (const o of obstacles) scene.remove(o.mesh);
     obstacles.length = 0;
     for (const pk of pickups) scene.remove(pk.mesh);
@@ -855,7 +1033,16 @@ function gameOver() {
     state = 'dead';
     P.alive = false;
     hud.classList.add('hidden');
+    pauseBtn.classList.add('hidden');
     finalScore.textContent = '🍣 ' + sushiCount + ' · ' + Math.floor(distance) + ' м';
+    if (sushiCount > bestRun.sushi) {
+        bestRun = { sushi: sushiCount, distance: Math.floor(distance) };
+        saveBestRun();
+    }
+    bestRunGameover.textContent = bestRun.sushi > 0
+        ? 'Лучший забег: 🍣 ' + bestRun.sushi + ' · ' + bestRun.distance + ' м'
+        : '';
+    bestRunWelcome.textContent = bestRunGameover.textContent;
     gameover.classList.remove('hidden');
 }
 
@@ -904,6 +1091,10 @@ function loseLife() {
     lives--;
     P.invuln = 1.2;
     resetCombo();
+    shakeMag = 0.5;
+    shakeT = 0.35;
+    sfxHit();
+    if (navigator.vibrate) try { navigator.vibrate([60, 30, 90]); } catch {}
     updateHud();
     if (lives <= 0) gameOver();
 }
@@ -943,16 +1134,34 @@ function collectPickup(kind, pos) {
         distance += 3;
         if (pos) spawnSparkles(pos.x, pos.y, pos.z, tier);
         if (combo >= 2) showCombo();
+        sfxPickup(tier);
+        const tierNow = Math.floor(sushiCount / FUR_COLOR_STEP);
+        if (tierNow > furTierApplied) {
+            furTierApplied = tierNow;
+            let next = FUR_PALETTE[Math.floor(Math.random() * FUR_PALETTE.length)];
+            if (next === FUR.color.getHex()) next = FUR_PALETTE[(FUR_PALETTE.indexOf(next) + 1) % FUR_PALETTE.length];
+            FUR.color.setHex(next);
+            for (let i = 0; i < 10; i++) {
+                spawnSparkles(P.x + (Math.random() - 0.5) * 1.2, P.y + 0.8 + Math.random() * 0.8, PLAYER_Z + (Math.random() - 0.5) * 0.8, 3);
+            }
+        }
         if (Math.floor(before / SUSHI_GOAL) < Math.floor(sushiCount / SUSHI_GOAL)) {
             celebrateMilestone();
+            sfxMilestone();
         }
     } else if (kind === 'heart') {
         if (lives < 3) lives++;
         else distance += 25;
         if (pos) spawnSparkles(pos.x, pos.y, pos.z, 2);
+        sfxBuff();
     } else if (kind === 'shield') {
         P.shield = 5;
         if (pos) spawnSparkles(pos.x, pos.y, pos.z, 2);
+        sfxBuff();
+    } else if (kind === 'magnet') {
+        P.magnet = 5;
+        if (pos) spawnSparkles(pos.x, pos.y, pos.z, 2);
+        sfxBuff();
     }
     updateHud();
 }
@@ -1060,12 +1269,27 @@ function tick(now) {
             nextSpawnZ = -(16 + Math.random() * 10);
         }
 
-        // Pickups scroll + bob + spin
+        // Pickups scroll + bob + spin (magnet pull if active)
         for (let i = pickups.length - 1; i >= 0; i--) {
             const pk = pickups[i];
             pk.mesh.position.z += dz;
             pk.mesh.rotation.y += dt * 2.5;
             pk.mesh.position.y = pk.baseY + Math.sin(t * 3 + pk.phase) * 0.13;
+            if (P.magnet > 0 && pk.kind === 'sushi') {
+                const tx = P.x, ty = P.y + 0.9, tz = PLAYER_Z;
+                const ddx = tx - pk.mesh.position.x;
+                const ddy = ty - pk.mesh.position.y;
+                const ddz = tz - pk.mesh.position.z;
+                const dist = Math.sqrt(ddx*ddx + ddy*ddy + ddz*ddz);
+                if (dist < 8) {
+                    const pull = Math.min(1, dt * 9);
+                    pk.mesh.position.x += ddx * pull;
+                    pk.mesh.position.y += ddy * pull;
+                    pk.mesh.position.z += ddz * pull;
+                    pk.lane = pk.mesh.position.x;
+                    pk.baseY = pk.mesh.position.y;
+                }
+            }
             if (pk.mesh.position.z > 12) {
                 scene.remove(pk.mesh);
                 pickups.splice(i, 1);
@@ -1146,8 +1370,38 @@ function tick(now) {
             }
         }
 
+        // Magnet visual
+        if (P.magnet > 0) {
+            P.magnet -= dt;
+            const fade = Math.min(1, P.magnet / 1.0);
+            magnetRing.visible = true;
+            magnetRing.position.set(P.x, P.y + 0.9, PLAYER_Z);
+            magnetRing.rotation.z += dt * 2.2;
+            magnetRing.material.opacity = (0.55 + Math.sin(t * 7) * 0.15) * fade;
+            magnetRing2.visible = true;
+            magnetRing2.position.set(P.x, P.y + 0.9, PLAYER_Z);
+            magnetRing2.rotation.x = Math.PI / 2;
+            magnetRing2.rotation.y += dt * 3.1;
+            magnetRing2.material.opacity = (0.45 + Math.sin(t * 9 + 1) * 0.15) * fade;
+            if (P.magnet <= 0) {
+                magnetRing.visible = false;
+                magnetRing2.visible = false;
+            }
+        }
+
+        // Camera shake
+        if (shakeT > 0) {
+            shakeT -= dt;
+            const k = Math.max(0, shakeT / 0.35) * shakeMag;
+            camera.position.x = (Math.random() - 0.5) * k * 2;
+            camera.position.y = 4.8 + (Math.random() - 0.5) * k * 2;
+            if (shakeT <= 0) { camera.position.x = 0; camera.position.y = 4.8; }
+        }
+
         checkCollisions();
         updateHud();
+    } else if (state === 'paused') {
+        // Hold frame, render only
     } else {
         // Gentle idle camera sway in menus
         player.rotation.y = Math.PI + Math.sin(t * 0.6) * 0.15;
@@ -1155,6 +1409,9 @@ function tick(now) {
         shieldMesh.visible = false;
         shieldGlow.visible = false;
         shieldLight.intensity = 0;
+        magnetRing.visible = false;
+        magnetRing2.visible = false;
+        if (shakeT > 0) { shakeT = 0; camera.position.x = 0; camera.position.y = 4.8; }
     }
 
     renderer.render(scene, camera);
