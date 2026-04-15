@@ -34,7 +34,7 @@ const skyTex = (() => {
     return t;
 })();
 scene.background = skyTex;
-scene.fog = new THREE.Fog(0x3a1c4c, 30, 88);
+scene.fog = new THREE.Fog(0x4e2866, 38, 105);
 
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 220);
 camera.position.set(0, 4.8, 7.5);
@@ -77,13 +77,13 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 120));
 resize();
 
 // ===================== Lights (twilight: warm key + cool fill) =====================
-scene.add(new THREE.HemisphereLight(0x5a3078, 0x1a0e28, 0.5));
+scene.add(new THREE.HemisphereLight(0x7a4a9c, 0x2a1842, 0.85));
 // Warm low sunset key from behind-left
-const sun = new THREE.DirectionalLight(0xdd7a55, 0.7);
+const sun = new THREE.DirectionalLight(0xffa070, 1.0);
 sun.position.set(-10, 8, -6);
 scene.add(sun);
 // Cool moonlight fill from opposite
-const moonLight = new THREE.DirectionalLight(0x8aa8e8, 0.4);
+const moonLight = new THREE.DirectionalLight(0xa6c4ff, 0.65);
 moonLight.position.set(12, 14, 5);
 scene.add(moonLight);
 
@@ -346,6 +346,23 @@ const heartTex = (() => {
     return t;
 })();
 
+const sparkleTex = (() => {
+    const size = 64;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    g.addColorStop(0.00, 'rgba(255,255,255,1)');
+    g.addColorStop(0.30, 'rgba(255,232,160,0.85)');
+    g.addColorStop(0.65, 'rgba(255,170,90,0.25)');
+    g.addColorStop(1.00, 'rgba(255,140,60,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+})();
+
 // Lazy AudioContext for SFX (must init inside user gesture on iOS)
 let audioCtx = null;
 function getAudioCtx() {
@@ -504,6 +521,37 @@ function spawnObstacle(z) {
     o.phase = Math.random() * Math.PI * 2;
     scene.add(o.mesh);
     obstacles.push(o);
+}
+
+// ===================== Sparkles (pickup burst) =====================
+const sparkles = [];
+
+function spawnSparkles(x, y, z, tier) {
+    const count = 6 + Math.min(6, tier);
+    for (let i = 0; i < count; i++) {
+        const mat = new THREE.SpriteMaterial({
+            map: sparkleTex,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+        });
+        const s = new THREE.Sprite(mat);
+        const sz = 0.32 + Math.random() * 0.22;
+        s.scale.set(sz, sz, 1);
+        s.position.set(x, y, z);
+        const ang = Math.random() * Math.PI * 2;
+        const sp = 2.2 + Math.random() * 2.0;
+        s.userData = {
+            vx: Math.cos(ang) * sp,
+            vy: 1.4 + Math.random() * 1.6,
+            vz: Math.sin(ang) * sp * 0.6,
+            life: 1,
+            ttl: 0.45 + Math.random() * 0.25,
+        };
+        scene.add(s);
+        sparkles.push(s);
+    }
 }
 
 // ===================== Floating bark hearts =====================
@@ -692,6 +740,9 @@ let speed = BASE_SPEED;
 let distance = 0;
 let lives = 3;
 let sushiCount = 0;
+let combo = 0;
+let comboTimer = 0;
+const COMBO_WINDOW = 2.0;
 let nextSpawnZ = -30;
 let nextPickupZ = -24;
 let barkT = 3 + Math.random() * 4;
@@ -700,6 +751,8 @@ let state = 'menu'; // 'menu' | 'play' | 'dead' | 'won'
 const hud = document.getElementById('hud');
 const sushiEl = document.getElementById('sushi');
 const livesEl = document.getElementById('lives');
+const progressFill = document.getElementById('progress-fill');
+const comboEl = document.getElementById('combo');
 const welcome = document.getElementById('welcome');
 const gameover = document.getElementById('gameover');
 const finalScore = document.getElementById('finalScore');
@@ -751,10 +804,15 @@ function startGame() {
     pickups.length = 0;
     for (const h of floatHearts) { scene.remove(h); h.material.dispose(); }
     floatHearts.length = 0;
+    for (const s of sparkles) { scene.remove(s); s.material.dispose(); }
+    sparkles.length = 0;
     speed = BASE_SPEED;
     distance = 0;
     lives = 3;
     sushiCount = 0;
+    combo = 0;
+    comboTimer = 0;
+    comboEl.classList.add('hidden');
     nextSpawnZ = -30;
     nextPickupZ = -24;
     barkT = 3 + Math.random() * 4;
@@ -763,8 +821,34 @@ function startGame() {
 }
 
 function updateHud() {
-    sushiEl.textContent = '🍣 ' + sushiCount + ' / ' + SUSHI_GOAL;
+    sushiEl.textContent = '🍣 ' + sushiCount;
     livesEl.textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, 3 - lives));
+    const ratio = (sushiCount % SUSHI_GOAL) / SUSHI_GOAL;
+    progressFill.style.width = (ratio * 100) + '%';
+}
+
+function showCombo() {
+    comboEl.textContent = 'x' + combo;
+    comboEl.classList.remove('hidden');
+    comboEl.classList.remove('pop');
+    void comboEl.offsetWidth;
+    comboEl.classList.add('pop');
+}
+
+function resetCombo() {
+    combo = 0;
+    comboTimer = 0;
+    comboEl.classList.add('hidden');
+}
+
+function celebrateMilestone() {
+    for (let i = 0; i < 3; i++) {
+        spawnSparkles(P.x + (Math.random() - 0.5) * 1.6, P.y + 1.2 + Math.random() * 0.8, PLAYER_Z + (Math.random() - 0.5) * 1.2, 3);
+    }
+    progressFill.animate(
+        [{ filter: 'brightness(1)' }, { filter: 'brightness(2.2)' }, { filter: 'brightness(1)' }],
+        { duration: 600, easing: 'ease-out' }
+    );
 }
 
 function gameOver() {
@@ -779,7 +863,7 @@ function victory() {
     state = 'won';
     P.alive = false;
     hud.classList.add('hidden');
-    victoryStats.textContent = '🍣 250 · ' + Math.floor(distance) + ' м по Токио';
+    victoryStats.textContent = '🍣 ' + sushiCount + ' · ' + Math.floor(distance) + ' м по Токио';
     victoryScreen.classList.remove('hidden');
 }
 
@@ -819,6 +903,7 @@ function checkCollisions() {
 function loseLife() {
     lives--;
     P.invuln = 1.2;
+    resetCombo();
     updateHud();
     if (lives <= 0) gameOver();
 }
@@ -840,27 +925,34 @@ function checkPickups(dz) {
         const playerCenterY = P.y + (P.sliding ? 0.35 : 0.9);
         if (Math.abs(pk.mesh.position.y - playerCenterY) < PICKUP_Y_R) {
             pk.collected = true;
+            const pos = pk.mesh.position.clone();
             scene.remove(pk.mesh);
             pickups.splice(i, 1);
-            collectPickup(pk.kind);
+            collectPickup(pk.kind, pos);
         }
     }
 }
 
-function collectPickup(kind) {
+function collectPickup(kind, pos) {
     if (kind === 'sushi') {
-        sushiCount++;
+        combo++;
+        comboTimer = COMBO_WINDOW;
+        const tier = combo >= 15 ? 3 : combo >= 10 ? 2 : combo >= 5 ? 1 : 0;
+        const before = sushiCount;
+        sushiCount += 1 + tier;
         distance += 3;
-        if (sushiCount >= SUSHI_GOAL && state === 'play') {
-            updateHud();
-            victory();
-            return;
+        if (pos) spawnSparkles(pos.x, pos.y, pos.z, tier);
+        if (combo >= 2) showCombo();
+        if (Math.floor(before / SUSHI_GOAL) < Math.floor(sushiCount / SUSHI_GOAL)) {
+            celebrateMilestone();
         }
     } else if (kind === 'heart') {
         if (lives < 3) lives++;
         else distance += 25;
+        if (pos) spawnSparkles(pos.x, pos.y, pos.z, 2);
     } else if (kind === 'shield') {
         P.shield = 5;
+        if (pos) spawnSparkles(pos.x, pos.y, pos.z, 2);
     }
     updateHud();
 }
@@ -919,6 +1011,11 @@ function tick(now) {
         }
 
         if (P.invuln > 0) P.invuln -= dt;
+
+        if (comboTimer > 0) {
+            comboTimer -= dt;
+            if (comboTimer <= 0) resetCombo();
+        }
 
         // Player transform + run animation
         const bob = P.y === 0 && !P.sliding ? Math.abs(Math.sin(t * 16)) * 0.08 : 0;
@@ -1002,6 +1099,28 @@ function tick(now) {
                 scene.remove(h);
                 h.material.dispose();
                 floatHearts.splice(i, 1);
+            }
+        }
+
+        // Update sparkles
+        for (let i = sparkles.length - 1; i >= 0; i--) {
+            const s = sparkles[i];
+            const d = s.userData;
+            s.position.x += d.vx * dt;
+            s.position.y += d.vy * dt;
+            s.position.z += (d.vz + speed) * dt;
+            d.vy -= 3.2 * dt;
+            d.vx *= 0.92;
+            d.vz *= 0.92;
+            d.life -= dt / d.ttl;
+            const op = Math.max(0, d.life);
+            s.material.opacity = op;
+            const sc = s.scale.x * (1 + dt * 1.5);
+            s.scale.set(sc, sc, 1);
+            if (d.life <= 0) {
+                scene.remove(s);
+                s.material.dispose();
+                sparkles.splice(i, 1);
             }
         }
 

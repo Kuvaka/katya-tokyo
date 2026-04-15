@@ -23,14 +23,18 @@
         <p class="sub">Мультипу бежит по токийским улочкам</p>
         <button id="startBtn" class="btn">Поехали!</button>
         <div class="hint">
-            Цель: собрать <b>125 🍣</b><br><br>
+            Беги и собирай суши без остановки ✨<br><br>
             Свайп ←→ — полоса · ↑ или тап — прыжок · ↓ — подкат<br>
             🍣 суши · 💖 жизнь · ✨ щит
         </div>
     </div>
 
     <div id="hud" class="hidden">
-        <div id="sushi">🍣 0 / 125</div>
+        <div id="hud-left">
+            <div id="sushi">🍣 0 / 125</div>
+            <div id="progress-wrap"><div id="progress-fill"></div></div>
+        </div>
+        <div id="combo" class="hidden">x2</div>
         <div id="lives">❤️❤️❤️</div>
     </div>
 
